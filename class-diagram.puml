@@ -1,0 +1,87 @@
+@startuml
+class Observable
+interface Observer
+
+class Model {
+  - List<Puzzle> puzzles
+  - Puzzle currentPuzzle
+  - int[][] board
+  - boolean[][] fixedCells
+  - BoardSnapshot undoSnapshot
+  - boolean validationFeedbackEnabled
+  - boolean hintEnabled
+  - boolean randomPuzzleSelectionEnabled
+  + int getCellValue(int, int)
+  + boolean isEditableCell(int, int)
+  + boolean isFixedCell(int, int)
+  + boolean isCellEmpty(int, int)
+  + boolean setCellValue(int, int, int)
+  + boolean clearCell(int, int)
+  + boolean canUndo()
+  + boolean undo()
+  + boolean canHintAt(int, int)
+  + boolean applyHint(int, int)
+  + void resetPuzzle()
+  + void newGame()
+  + boolean isSolved()
+  + Set<CellPosition> getInvalidCells()
+  + boolean isValidationFeedbackEnabled()
+  + void setValidationFeedbackEnabled(boolean)
+  + boolean isHintEnabled()
+  + void setHintEnabled(boolean)
+  + boolean isRandomPuzzleSelectionEnabled()
+  + void setRandomPuzzleSelectionEnabled(boolean)
+}
+
+class SudokuController {
+  - Model model
+  - SudokuView view
+  - int selectedRow
+  - int selectedColumn
+  + void attachView(SudokuView)
+  + void selectCell(int, int)
+  + void moveSelection(int, int)
+  + void handleNumberInput(int)
+  + void eraseSelectedCell()
+  + void undo()
+  + void hintSelectedCell()
+  + void resetPuzzle()
+  + void newGame()
+  + void setValidationFeedbackEnabled(boolean)
+  + void setHintEnabled(boolean)
+  + void setRandomPuzzleSelectionEnabled(boolean)
+  + void refreshActionAvailability()
+}
+
+class SudokuView {
+  - Model model
+  - SudokuController controller
+  - JTextField[][] cells
+  - JButton[] digitButtons
+  + void attachController(SudokuController)
+  + void setSelectedCell(int, int)
+  + void setControlStates(boolean, boolean, boolean, boolean)
+  + void showCompletionMessage()
+  + void update(Observable, Object)
+}
+
+class SudokuGUI {
+  + static void main(String[])
+}
+
+class SudokuCLI {
+  - Model model
+  + static void main(String[])
+}
+
+Observable <|-- Model
+Observer <|.. SudokuView
+SudokuController --> Model
+SudokuController --> SudokuView
+SudokuView --> Model
+SudokuView --> SudokuController
+SudokuGUI ..> Model
+SudokuGUI ..> SudokuView
+SudokuGUI ..> SudokuController
+SudokuCLI --> Model
+@enduml
