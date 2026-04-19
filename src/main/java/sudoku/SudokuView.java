@@ -33,10 +33,10 @@ public class SudokuView extends JFrame implements Observer {
     private static final Color INVALID_BACKGROUND = new Color(255, 219, 219);
     private static final Color SELECTED_BACKGROUND = new Color(214, 234, 248);
 
-    private final Model model;
+    private final SudokuModel model;
     private SudokuController controller;
 
-    private final JTextField[][] cells = new JTextField[Model.SIZE][Model.SIZE];
+    private final JTextField[][] cells = new JTextField[SudokuModel.SIZE][SudokuModel.SIZE];
     private final JButton[] digitButtons = new JButton[9];
     private final JButton eraseButton = new JButton("Erase");
     private final JButton undoButton = new JButton("Undo");
@@ -50,13 +50,13 @@ public class SudokuView extends JFrame implements Observer {
     private int selectedRow;
     private int selectedColumn;
 
-    public SudokuView(Model model) {
+    public SudokuView(SudokuModel model) {
         super("Sudoku");
         assert model != null : "model != null";
         this.model = model;
         this.model.addObserver(this);
         buildInterface();
-        update(model, null);
+        update(null, null);
     }
 
     public void attachController(SudokuController controller) {
@@ -112,10 +112,10 @@ public class SudokuView extends JFrame implements Observer {
     }
 
     private JPanel buildGridPanel() {
-        JPanel gridPanel = new JPanel(new GridLayout(Model.SIZE, Model.SIZE));
+        JPanel gridPanel = new JPanel(new GridLayout(SudokuModel.SIZE, SudokuModel.SIZE));
         gridPanel.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
-        for (int row = 0; row < Model.SIZE; row++) {
-            for (int column = 0; column < Model.SIZE; column++) {
+        for (int row = 0; row < SudokuModel.SIZE; row++) {
+            for (int column = 0; column < SudokuModel.SIZE; column++) {
                 JTextField cell = new JTextField();
                 cell.setHorizontalAlignment(SwingConstants.CENTER);
                 cell.setFont(new Font("SansSerif", Font.BOLD, 24));
@@ -220,11 +220,11 @@ public class SudokuView extends JFrame implements Observer {
     }
 
     private void refreshBoard() {
-        Set<Model.CellPosition> invalidCells = model.isValidationFeedbackEnabled()
+        Set<SudokuModel.CellPosition> invalidCells = model.isValidationFeedbackEnabled()
                 ? model.getInvalidCells()
                 : Collections.emptySet();
-        for (int row = 0; row < Model.SIZE; row++) {
-            for (int column = 0; column < Model.SIZE; column++) {
+        for (int row = 0; row < SudokuModel.SIZE; row++) {
+            for (int column = 0; column < SudokuModel.SIZE; column++) {
                 JTextField cell = cells[row][column];
                 int value = model.getCellValue(row, column);
                 cell.setText(value == 0 ? "" : String.valueOf(value));
@@ -235,9 +235,9 @@ public class SudokuView extends JFrame implements Observer {
         }
     }
 
-    private Color resolveCellBackground(int row, int column, Set<Model.CellPosition> invalidCells) {
+    private Color resolveCellBackground(int row, int column, Set<SudokuModel.CellPosition> invalidCells) {
         Color background = model.isFixedCell(row, column) ? FIXED_BACKGROUND : EDITABLE_BACKGROUND;
-        boolean invalid = invalidCells.contains(new Model.CellPosition(row, column));
+        boolean invalid = invalidCells.contains(new SudokuModel.CellPosition(row, column));
         if (invalid) {
             background = INVALID_BACKGROUND;
         } else if (row == selectedRow && column == selectedColumn) {
@@ -249,8 +249,8 @@ public class SudokuView extends JFrame implements Observer {
     private Border createCellBorder(int row, int column) {
         int top = row % 3 == 0 ? 2 : 1;
         int left = column % 3 == 0 ? 2 : 1;
-        int bottom = row == Model.SIZE - 1 ? 2 : (row % 3 == 2 ? 2 : 1);
-        int right = column == Model.SIZE - 1 ? 2 : (column % 3 == 2 ? 2 : 1);
+        int bottom = row == SudokuModel.SIZE - 1 ? 2 : (row % 3 == 2 ? 2 : 1);
+        int right = column == SudokuModel.SIZE - 1 ? 2 : (column % 3 == 2 ? 2 : 1);
         Color borderColor = row == selectedRow && column == selectedColumn ? new Color(41, 128, 185) : Color.BLACK;
         return BorderFactory.createMatteBorder(top, left, bottom, right, borderColor);
     }

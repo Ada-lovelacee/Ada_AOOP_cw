@@ -1,87 +1,295 @@
 @startuml
-class Observable
-interface Observer
+left to right direction
+skinparam classAttributeIconSize 0
+skinparam wrapWidth 220
+skinparam maxMessageSize 220
+
+interface SudokuModel {
+  + {static} SIZE: int = 9
+  + getCellValue(row: int, column: int): int
+  + isEditableCell(row: int, column: int): boolean
+  + isFixedCell(row: int, column: int): boolean
+  + isCellEmpty(row: int, column: int): boolean
+  + setCellValue(row: int, column: int, value: int): boolean
+  + clearCell(row: int, column: int): boolean
+  + canUndo(): boolean
+  + undo(): boolean
+  + canHintAt(row: int, column: int): boolean
+  + applyHint(row: int, column: int): boolean
+  + resetPuzzle(): void
+  + newGame(): void
+  + isSolved(): boolean
+  + getInvalidCells(): Set<CellPosition>
+  + isValidationFeedbackEnabled(): boolean
+  + setValidationFeedbackEnabled(enabled: boolean): void
+  + isHintEnabled(): boolean
+  + setHintEnabled(enabled: boolean): void
+  + isRandomPuzzleSelectionEnabled(): boolean
+  + setRandomPuzzleSelectionEnabled(enabled: boolean): void
+  + addObserver(observer: Observer): void
+}
+
+class "CellPosition" as CellPosition <<record>> {
+  - row: int
+  - column: int
+  + CellPosition(row: int, column: int)
+  + row(): int
+  + column(): int
+}
+
+class Observable <<library>>
+interface Observer <<library>>
+class JFrame <<library>>
+class SwingUtilities <<library>>
 
 class Model {
-  - List<Puzzle> puzzles
-  - Puzzle currentPuzzle
-  - int[][] board
-  - boolean[][] fixedCells
-  - BoardSnapshot undoSnapshot
-  - boolean validationFeedbackEnabled
-  - boolean hintEnabled
-  - boolean randomPuzzleSelectionEnabled
-  + int getCellValue(int, int)
-  + boolean isEditableCell(int, int)
-  + boolean isFixedCell(int, int)
-  + boolean isCellEmpty(int, int)
-  + boolean setCellValue(int, int, int)
-  + boolean clearCell(int, int)
-  + boolean canUndo()
-  + boolean undo()
-  + boolean canHintAt(int, int)
-  + boolean applyHint(int, int)
-  + void resetPuzzle()
-  + void newGame()
-  + boolean isSolved()
-  + Set<CellPosition> getInvalidCells()
-  + boolean isValidationFeedbackEnabled()
-  + void setValidationFeedbackEnabled(boolean)
-  + boolean isHintEnabled()
-  + void setHintEnabled(boolean)
-  + boolean isRandomPuzzleSelectionEnabled()
-  + void setRandomPuzzleSelectionEnabled(boolean)
+  - {static} PUZZLE_RESOURCE: String = "/puzzles.txt"
+  - puzzles: List<Puzzle>
+  - random: Random
+  - currentPuzzle: Puzzle
+  - board: int[][]
+  - fixedCells: boolean[][]
+  - undoSnapshots: List<BoardSnapshot>
+  - validationFeedbackEnabled: boolean = true
+  - hintEnabled: boolean = true
+  - randomPuzzleSelectionEnabled: boolean = true
+  --
+  + Model()
+  ~ Model(random: Random)
+  + getCellValue(row: int, column: int): int
+  + isEditableCell(row: int, column: int): boolean
+  + isFixedCell(row: int, column: int): boolean
+  + isCellEmpty(row: int, column: int): boolean
+  + setCellValue(row: int, column: int, value: int): boolean
+  + clearCell(row: int, column: int): boolean
+  + canUndo(): boolean
+  + undo(): boolean
+  + canHintAt(row: int, column: int): boolean
+  + applyHint(row: int, column: int): boolean
+  + resetPuzzle(): void
+  + newGame(): void
+  + isSolved(): boolean
+  + getInvalidCells(): Set<CellPosition>
+  + isValidationFeedbackEnabled(): boolean
+  + setValidationFeedbackEnabled(enabled: boolean): void
+  + isHintEnabled(): boolean
+  + setHintEnabled(enabled: boolean): void
+  + isRandomPuzzleSelectionEnabled(): boolean
+  + setRandomPuzzleSelectionEnabled(enabled: boolean): void
+  --
+  - publishChange(): void
+  - selectPuzzleIndex(): int
+  - loadPuzzle(puzzleIndex: int): void
+  - saveUndoSnapshot(): void
+  - loadPuzzles(): List<Puzzle>
+  - parsePuzzle(line: String): Puzzle
+  - parseGrid(text: String, allowZero: boolean): int[][]
+  - validatePuzzleConsistency(puzzle: int[][], solution: int[][]): void
+  - solvePuzzle(puzzle: int[][]): int[][]
+  - solveCell(grid: int[][], row: int, column: int): boolean
+  - isValidPlacement(grid: int[][], row: int, column: int, value: int): boolean
+  - isRowValidForPlacement(grid: int[][], row: int, value: int): boolean
+  - isColumnValidForPlacement(grid: int[][], column: int, value: int): boolean
+  - isBoxValidForPlacement(grid: int[][], row: int, column: int, value: int): boolean
+  - isValidSolvedGrid(grid: int[][]): boolean
+  - noDuplicatesInRows(grid: int[][]): boolean
+  - noDuplicatesInColumns(grid: int[][]): boolean
+  - noDuplicatesInBoxes(grid: int[][]): boolean
+  - markInvalidRows(invalidCells: Set<CellPosition>): void
+  - markInvalidColumns(invalidCells: Set<CellPosition>): void
+  - markInvalidBoxes(invalidCells: Set<CellPosition>): void
+  - boardsEqual(left: int[][], right: int[][]): boolean
+  - copyOf(source: int[][]): int[][]
+  - isInBounds(row: int, column: int): boolean
+  - invariant(): boolean
+}
+
+class "Puzzle" as ModelPuzzle <<record>> {
+  - puzzle: int[][]
+  - solution: int[][]
+  + Puzzle(puzzle: int[][], solution: int[][])
+  + puzzle(): int[][]
+  + solution(): int[][]
+}
+
+class "BoardSnapshot" as BoardSnapshot <<record>> {
+  - boardState: int[][]
+  + BoardSnapshot(boardState: int[][])
+  + boardState(): int[][]
 }
 
 class SudokuController {
-  - Model model
-  - SudokuView view
-  - int selectedRow
-  - int selectedColumn
-  + void attachView(SudokuView)
-  + void selectCell(int, int)
-  + void moveSelection(int, int)
-  + void handleNumberInput(int)
-  + void eraseSelectedCell()
-  + void undo()
-  + void hintSelectedCell()
-  + void resetPuzzle()
-  + void newGame()
-  + void setValidationFeedbackEnabled(boolean)
-  + void setHintEnabled(boolean)
-  + void setRandomPuzzleSelectionEnabled(boolean)
-  + void refreshActionAvailability()
+  - model: SudokuModel
+  - view: SudokuView
+  - selectedRow: int
+  - selectedColumn: int
+  --
+  + SudokuController(model: SudokuModel)
+  + attachView(view: SudokuView): void
+  + selectCell(row: int, column: int): void
+  + moveSelection(rowDelta: int, columnDelta: int): void
+  + handleNumberInput(value: int): void
+  + eraseSelectedCell(): void
+  + undo(): void
+  + hintSelectedCell(): void
+  + resetPuzzle(): void
+  + newGame(): void
+  + setValidationFeedbackEnabled(enabled: boolean): void
+  + setHintEnabled(enabled: boolean): void
+  + setRandomPuzzleSelectionEnabled(enabled: boolean): void
+  + refreshActionAvailability(): void
+  --
+  - finishBoardAction(): void
+  - isInBounds(row: int, column: int): boolean
 }
 
 class SudokuView {
-  - Model model
-  - SudokuController controller
-  - JTextField[][] cells
-  - JButton[] digitButtons
-  + void attachController(SudokuController)
-  + void setSelectedCell(int, int)
-  + void setControlStates(boolean, boolean, boolean, boolean)
-  + void showCompletionMessage()
-  + void update(Observable, Object)
+  - {static} FIXED_BACKGROUND: Color
+  - {static} EDITABLE_BACKGROUND: Color
+  - {static} INVALID_BACKGROUND: Color
+  - {static} SELECTED_BACKGROUND: Color
+  - model: SudokuModel
+  - controller: SudokuController
+  - cells: JTextField[][]
+  - digitButtons: JButton[]
+  - eraseButton: JButton
+  - undoButton: JButton
+  - hintButton: JButton
+  - resetButton: JButton
+  - newGameButton: JButton
+  - validationFeedbackBox: JCheckBox
+  - hintBox: JCheckBox
+  - randomPuzzleBox: JCheckBox
+  - selectedRow: int
+  - selectedColumn: int
+  --
+  + SudokuView(model: SudokuModel)
+  + attachController(controller: SudokuController): void
+  + setSelectedCell(row: int, column: int): void
+  + setControlStates(digitInputEnabled: boolean, eraseEnabled: boolean, hintEnabled: boolean, undoEnabled: boolean): void
+  + showCompletionMessage(): void
+  + update(observable: Observable, argument: Object): void
+  --
+  - buildInterface(): void
+  - buildGridPanel(): JPanel
+  - buildRightPanel(): JPanel
+  - wireActions(): void
+  - installCellHandlers(cell: JTextField, row: int, column: int): void
+  - extractDigit(event: KeyEvent): int
+  - refreshBoard(): void
+  - resolveCellBackground(row: int, column: int, invalidCells: Set<CellPosition>): Color
+  - createCellBorder(row: int, column: int): Border
 }
 
-class SudokuGUI {
-  + static void main(String[])
+class SudokuGUI <<final>> {
+  - SudokuGUI()
+  + {static} main(args: String[]): void
 }
 
 class SudokuCLI {
-  - Model model
-  + static void main(String[])
+  - model: SudokuModel
+  --
+  + {static} main(args: String[]): void
+  - run(): void
+  - processCommand(line: String): boolean
+  - handleSet(parts: String[]): void
+  - handleClear(parts: String[]): void
+  - handleUndo(parts: String[]): void
+  - handleHint(parts: String[]): void
+  - handleReset(parts: String[]): void
+  - handleNew(parts: String[]): void
+  - afterBoardAction(): void
+  - printBoard(): void
+  - requireLength(parts: String[], expectedLength: int): void
+  - parseIndex(text: String): int
+  - parseValue(text: String): int
 }
 
-Observable <|-- Model
-Observer <|.. SudokuView
-SudokuController --> Model
-SudokuController --> SudokuView
-SudokuView --> Model
-SudokuView --> SudokuController
-SudokuGUI ..> Model
-SudokuGUI ..> SudokuView
-SudokuGUI ..> SudokuController
-SudokuCLI --> Model
+SudokuModel +-- CellPosition : nested record
+Model +-- ModelPuzzle : private nested record
+Model +-- BoardSnapshot : private nested record
+
+Model --|> Observable
+Model ..|> SudokuModel
+SudokuView --|> JFrame
+SudokuView ..|> Observer
+
+Model *-- "1..*" ModelPuzzle : puzzles
+Model --> "1" ModelPuzzle : currentPuzzle
+Model *-- "0..*" BoardSnapshot : undoSnapshots
+
+SudokuController --> SudokuModel : model
+SudokuView --> SudokuModel : model
+SudokuController "0..1" <--> "0..1" SudokuView : attached after startup
+SudokuCLI --> SudokuModel : model
+SudokuGUI ..> Model : new Model()
+SudokuGUI ..> SudokuView : creates
+SudokuGUI ..> SudokuController : creates
+SudokuGUI ..> SwingUtilities : invokeLater()
+SudokuModel ..> Observer : addObserver(observer)
+
+note top of SudokuModel
+Required model boundary for the MVC design:
+the controller and view depend on the interface,
+while Model provides the concrete implementation.
+end note
+
+note right of Model
+Key method-call structure:
+- Model() -> loadPuzzles(), loadPuzzle(selectPuzzleIndex())
+- setCellValue()/clearCell()/applyHint()/resetPuzzle() -> saveUndoSnapshot(), publishChange()
+- newGame() -> loadPuzzle(selectPuzzleIndex()), publishChange()
+- getInvalidCells() -> markInvalidRows(), markInvalidColumns(), markInvalidBoxes()
+- parsePuzzle() -> parseGrid(), solvePuzzle(), validatePuzzleConsistency()
+- solvePuzzle() -> solveCell()
+- solveCell() -> isValidPlacement(), solveCell()
+- isValidPlacement() -> isRowValidForPlacement(), isColumnValidForPlacement(), isBoxValidForPlacement()
+- isValidSolvedGrid() -> noDuplicatesInRows(), noDuplicatesInColumns(), noDuplicatesInBoxes()
+- publishChange() -> setChanged(), notifyObservers()
+end note
+
+note right of SudokuController
+Key controller call flow:
+- attachView() -> view.setSelectedCell(), refreshActionAvailability()
+- selectCell() -> view.setSelectedCell(), refreshActionAvailability()
+- moveSelection() -> selectCell()
+- handleNumberInput() -> model.isEditableCell(), model.setCellValue(), finishBoardAction()
+- eraseSelectedCell() -> model.isEditableCell(), model.clearCell(), finishBoardAction()
+- undo() -> model.undo(), finishBoardAction()
+- hintSelectedCell() -> model.applyHint(), finishBoardAction()
+- resetPuzzle()/newGame()/set...Enabled() -> model..., refreshActionAvailability()
+- finishBoardAction() -> refreshActionAvailability(), model.isSolved(), view.showCompletionMessage()
+- refreshActionAvailability() -> model.isEditableCell(), model.isCellEmpty(), model.isHintEnabled(), model.canUndo(), view.setControlStates()
+end note
+
+note right of SudokuView
+Key view call flow:
+- SudokuView() -> model.addObserver(this), buildInterface(), update()
+- attachController() -> wireActions()
+- setSelectedCell() -> refreshBoard(), requestFocusInWindow()
+- update() -> model.isValidationFeedbackEnabled(), model.isHintEnabled(), model.isRandomPuzzleSelectionEnabled(), refreshBoard(), controller.refreshActionAvailability()
+- buildInterface() -> buildGridPanel(), buildRightPanel()
+- buildGridPanel() -> installCellHandlers()
+- installCellHandlers() -> controller.selectCell(), moveSelection(), handleNumberInput()
+- refreshBoard() -> model.getInvalidCells(), model.getCellValue(), model.isFixedCell(), createCellBorder(), resolveCellBackground()
+- resolveCellBackground() -> invalidCells.contains(CellPosition)
+end note
+
+note right of SudokuCLI
+Key CLI call flow:
+- main() -> new SudokuCLI().run()
+- run() -> printBoard(), processCommand()
+- processCommand() -> handleSet()/handleClear()/handleUndo()/handleHint()/handleReset()/handleNew()
+- each handle...() -> model..., afterBoardAction()
+- afterBoardAction() -> printBoard(), model.getInvalidCells(), model.isSolved()
+- printBoard() -> model.getCellValue()
+end note
+
+note right of SudokuGUI
+main() calls SwingUtilities.invokeLater(),
+creates Model, SudokuView and SudokuController,
+then calls view.attachController(), controller.attachView(),
+and finally view.setVisible(true).
+end note
+
 @enduml

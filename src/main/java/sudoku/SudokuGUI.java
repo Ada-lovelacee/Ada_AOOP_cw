@@ -8,7 +8,7 @@ public final class SudokuGUI {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            Model model = new Model();
+            SudokuModel model = new Model();
             SudokuView view = new SudokuView(model);
             SudokuController controller = new SudokuController(model);
             view.attachController(controller);

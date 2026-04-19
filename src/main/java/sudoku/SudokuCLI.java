@@ -4,7 +4,7 @@ import java.util.Scanner;
 import java.util.Set;
 
 public class SudokuCLI {
-    private final Model model = new Model();
+    private final SudokuModel model = new Model();
 
     public static void main(String[] args) {
         new SudokuCLI().run();
@@ -104,7 +104,7 @@ public class SudokuCLI {
     private void afterBoardAction() {
         printBoard();
         if (model.isValidationFeedbackEnabled()) {
-            Set<Model.CellPosition> invalidCells = model.getInvalidCells();
+            Set<SudokuModel.CellPosition> invalidCells = model.getInvalidCells();
             if (!invalidCells.isEmpty()) {
                 System.out.println("Invalid move detected.");
             }
@@ -115,11 +115,11 @@ public class SudokuCLI {
     }
 
     private void printBoard() {
-        for (int row = 0; row < Model.SIZE; row++) {
+        for (int row = 0; row < SudokuModel.SIZE; row++) {
             if (row % 3 == 0) {
                 System.out.println("+-------+-------+-------+");
             }
-            for (int column = 0; column < Model.SIZE; column++) {
+            for (int column = 0; column < SudokuModel.SIZE; column++) {
                 if (column % 3 == 0) {
                     System.out.print("| ");
                 }
@@ -139,7 +139,7 @@ public class SudokuCLI {
 
     private int parseIndex(String text) {
         int value = Integer.parseInt(text);
-        if (value < 1 || value > Model.SIZE) {
+        if (value < 1 || value > SudokuModel.SIZE) {
             throw new IllegalArgumentException("Row and column must be between 1 and 9.");
         }
         return value - 1;

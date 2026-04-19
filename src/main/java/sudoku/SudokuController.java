@@ -1,13 +1,13 @@
 package sudoku;
 
 public class SudokuController {
-    private final Model model;
+    private final SudokuModel model;
     private SudokuView view;
 
     private int selectedRow;
     private int selectedColumn;
 
-    public SudokuController(Model model) {
+    public SudokuController(SudokuModel model) {
         assert model != null : "model != null";
         this.model = model;
         this.selectedRow = 0;
@@ -34,8 +34,8 @@ public class SudokuController {
     }
 
     public void moveSelection(int rowDelta, int columnDelta) {
-        int newRow = Math.max(0, Math.min(Model.SIZE - 1, selectedRow + rowDelta));
-        int newColumn = Math.max(0, Math.min(Model.SIZE - 1, selectedColumn + columnDelta));
+        int newRow = Math.max(0, Math.min(SudokuModel.SIZE - 1, selectedRow + rowDelta));
+        int newColumn = Math.max(0, Math.min(SudokuModel.SIZE - 1, selectedColumn + columnDelta));
         selectCell(newRow, newColumn);
     }
 
@@ -113,6 +113,6 @@ public class SudokuController {
     }
 
     private boolean isInBounds(int row, int column) {
-        return row >= 0 && row < Model.SIZE && column >= 0 && column < Model.SIZE;
+        return row >= 0 && row < SudokuModel.SIZE && column >= 0 && column < SudokuModel.SIZE;
     }
 }
