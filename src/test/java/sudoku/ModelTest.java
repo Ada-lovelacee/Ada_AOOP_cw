@@ -15,29 +15,33 @@ class ModelTest {
         Model model = new Model(new Random(0L));
         model.setRandomPuzzleSelectionEnabled(false);
         model.newGame();
-        fillAllEditableCellsExcept(model, 8, 8);
+        SudokuModel.CellPosition finalCell = findLastEditableCell(model);
+        fillAllEditableCellsExceptWithHints(model, finalCell.row(), finalCell.column());
 
         assertFalse(model.isSolved());
 
-        assertTrue(model.setCellValue(8, 8, 9));
+        assertTrue(model.applyHint(finalCell.row(), finalCell.column()));
         assertTrue(model.isSolved());
     }
 
     @Test
     void reportsDuplicatesAcrossRowsColumnsAndBoxes() {
-        // Scenario: two editable moves create duplicates in a row, a column and the same 3x3 box.
+        // Scenario: two editable moves trigger duplicate detection across a row, a column and 3x3 boxes.
         Model model = new Model(new Random(0L));
         model.setRandomPuzzleSelectionEnabled(false);
         model.newGame();
-        model.setCellValue(0, 2, 5);
-        model.setCellValue(1, 1, 3);
+        PlacementScenario rowScenario = findRowBoxDuplicateScenario(model);
+        PlacementScenario columnScenario = findColumnBoxDuplicateScenario(model, rowScenario.target());
 
-        Set<Model.CellPosition> invalidCells = model.getInvalidCells();
+        assertTrue(model.setCellValue(rowScenario.target().row(), rowScenario.target().column(), rowScenario.duplicateValue()));
+        assertTrue(model.setCellValue(columnScenario.target().row(), columnScenario.target().column(), columnScenario.duplicateValue()));
 
-        assertTrue(invalidCells.contains(new Model.CellPosition(0, 0)));
-        assertTrue(invalidCells.contains(new Model.CellPosition(0, 1)));
-        assertTrue(invalidCells.contains(new Model.CellPosition(0, 2)));
-        assertTrue(invalidCells.contains(new Model.CellPosition(1, 1)));
+        Set<SudokuModel.CellPosition> invalidCells = model.getInvalidCells();
+
+        assertTrue(invalidCells.contains(rowScenario.target()));
+        assertTrue(invalidCells.contains(rowScenario.conflict()));
+        assertTrue(invalidCells.contains(columnScenario.target()));
+        assertTrue(invalidCells.contains(columnScenario.conflict()));
         assertFalse(model.isSolved());
     }
 
@@ -47,43 +51,155 @@ class ModelTest {
         Model model = new Model(new Random(0L));
         model.setRandomPuzzleSelectionEnabled(false);
         model.newGame();
-        int fixedValue = model.getCellValue(0, 0);
+        SudokuModel.CellPosition hintedCell = findFirstEditableCell(model);
+        SudokuModel.CellPosition fixedCell = findFirstFixedCell(model);
+        int fixedValue = model.getCellValue(fixedCell.row(), fixedCell.column());
 
-        assertTrue(model.applyHint(0, 2));
-        assertEquals(4, model.getCellValue(0, 2));
+        assertTrue(model.applyHint(hintedCell.row(), hintedCell.column()));
+        int hintedValue = model.getCellValue(hintedCell.row(), hintedCell.column());
+        assertTrue(hintedValue >= 1 && hintedValue <= 9);
 
         assertTrue(model.undo());
-        assertEquals(0, model.getCellValue(0, 2));
+        assertEquals(0, model.getCellValue(hintedCell.row(), hintedCell.column()));
 
-        assertTrue(model.setCellValue(0, 2, 4));
+        assertTrue(model.setCellValue(hintedCell.row(), hintedCell.column(), hintedValue));
         model.resetPuzzle();
 
-        assertEquals(0, model.getCellValue(0, 2));
-        assertEquals(fixedValue, model.getCellValue(0, 0));
-        assertFalse(model.clearCell(0, 0));
+        assertEquals(0, model.getCellValue(hintedCell.row(), hintedCell.column()));
+        assertEquals(fixedValue, model.getCellValue(fixedCell.row(), fixedCell.column()));
+        assertFalse(model.clearCell(fixedCell.row(), fixedCell.column()));
     }
 
-    private void fillAllEditableCellsExcept(Model model, int excludedRow, int excludedColumn) {
-        int[][] solution = {
-                {5, 3, 4, 6, 7, 8, 9, 1, 2},
-                {6, 7, 2, 1, 9, 5, 3, 4, 8},
-                {1, 9, 8, 3, 4, 2, 5, 6, 7},
-                {8, 5, 9, 7, 6, 1, 4, 2, 3},
-                {4, 2, 6, 8, 5, 3, 7, 9, 1},
-                {7, 1, 3, 9, 2, 4, 8, 5, 6},
-                {9, 6, 1, 5, 3, 7, 2, 8, 4},
-                {2, 8, 7, 4, 1, 9, 6, 3, 5},
-                {3, 4, 5, 2, 8, 6, 1, 7, 9}
-        };
-        for (int row = 0; row < Model.SIZE; row++) {
-            for (int column = 0; column < Model.SIZE; column++) {
+    private void fillAllEditableCellsExceptWithHints(SudokuModel model, int excludedRow, int excludedColumn) {
+        for (int row = 0; row < SudokuModel.SIZE; row++) {
+            for (int column = 0; column < SudokuModel.SIZE; column++) {
                 if (row == excludedRow && column == excludedColumn) {
                     continue;
                 }
                 if (model.isEditableCell(row, column)) {
-                    model.setCellValue(row, column, solution[row][column]);
+                    assertTrue(model.applyHint(row, column));
                 }
             }
         }
     }
+
+    private SudokuModel.CellPosition findLastEditableCell(SudokuModel model) {
+        SudokuModel.CellPosition result = null;
+        for (int row = 0; row < SudokuModel.SIZE; row++) {
+            for (int column = 0; column < SudokuModel.SIZE; column++) {
+                if (model.isEditableCell(row, column)) {
+                    result = new SudokuModel.CellPosition(row, column);
+                }
+            }
+        }
+        assertTrue(result != null);
+        return result;
+    }
+
+    private SudokuModel.CellPosition findFirstEditableCell(SudokuModel model) {
+        for (int row = 0; row < SudokuModel.SIZE; row++) {
+            for (int column = 0; column < SudokuModel.SIZE; column++) {
+                if (model.isEditableCell(row, column)) {
+                    return new SudokuModel.CellPosition(row, column);
+                }
+            }
+        }
+        throw new AssertionError("Expected at least one editable cell");
+    }
+
+    private SudokuModel.CellPosition findFirstFixedCell(SudokuModel model) {
+        for (int row = 0; row < SudokuModel.SIZE; row++) {
+            for (int column = 0; column < SudokuModel.SIZE; column++) {
+                if (model.isFixedCell(row, column)) {
+                    return new SudokuModel.CellPosition(row, column);
+                }
+            }
+        }
+        throw new AssertionError("Expected at least one fixed cell");
+    }
+
+    private PlacementScenario findRowBoxDuplicateScenario(SudokuModel model) {
+        for (int row = 0; row < SudokuModel.SIZE; row++) {
+            for (int column = 0; column < SudokuModel.SIZE; column++) {
+                if (!model.isEditableCell(row, column) || !model.isCellEmpty(row, column)) {
+                    continue;
+                }
+                SudokuModel.CellPosition conflict = findFixedWithSameBoxDifferentColumn(model, row, column, row);
+                if (conflict != null) {
+                    return new PlacementScenario(
+                            new SudokuModel.CellPosition(row, column),
+                            model.getCellValue(conflict.row(), conflict.column()),
+                            conflict
+                    );
+                }
+            }
+        }
+        throw new AssertionError("Expected a cell that can duplicate a row and box value");
+    }
+
+    private PlacementScenario findColumnBoxDuplicateScenario(
+            SudokuModel model,
+            SudokuModel.CellPosition excludedTarget
+    ) {
+        for (int row = 0; row < SudokuModel.SIZE; row++) {
+            for (int column = 0; column < SudokuModel.SIZE; column++) {
+                SudokuModel.CellPosition target = new SudokuModel.CellPosition(row, column);
+                if (target.equals(excludedTarget) || !model.isEditableCell(row, column) || !model.isCellEmpty(row, column)) {
+                    continue;
+                }
+                SudokuModel.CellPosition conflict = findFixedWithSameBoxDifferentRow(model, row, column, column);
+                if (conflict != null) {
+                    return new PlacementScenario(
+                            target,
+                            model.getCellValue(conflict.row(), conflict.column()),
+                            conflict
+                    );
+                }
+            }
+        }
+        throw new AssertionError("Expected a cell that can duplicate a column and box value");
+    }
+
+    private SudokuModel.CellPosition findFixedWithSameBoxDifferentColumn(
+            SudokuModel model,
+            int targetRow,
+            int targetColumn,
+            int requiredRow
+    ) {
+        int boxColumn = (targetColumn / 3) * 3;
+        for (int column = boxColumn; column < boxColumn + 3; column++) {
+            if (column == targetColumn) {
+                continue;
+            }
+            if (model.isFixedCell(requiredRow, column)) {
+                return new SudokuModel.CellPosition(requiredRow, column);
+            }
+        }
+        return null;
+    }
+
+    private SudokuModel.CellPosition findFixedWithSameBoxDifferentRow(
+            SudokuModel model,
+            int targetRow,
+            int targetColumn,
+            int requiredColumn
+    ) {
+        int boxRow = (targetRow / 3) * 3;
+        int boxColumn = (targetColumn / 3) * 3;
+        for (int row = boxRow; row < boxRow + 3; row++) {
+            if (row == targetRow) {
+                continue;
+            }
+            if (model.isFixedCell(row, requiredColumn)) {
+                return new SudokuModel.CellPosition(row, requiredColumn);
+            }
+        }
+        return null;
+    }
+
+    private record PlacementScenario(
+            SudokuModel.CellPosition target,
+            int duplicateValue,
+            SudokuModel.CellPosition conflict
+    ) { }
 }

@@ -10,22 +10,37 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Observable;
+import java.util.Observer;
 import java.util.Random;
 import java.util.Set;
 
 /**
  * Model for both the GUI and CLI Sudoku programs.
- *
- * Class invariants:
- * 1. puzzles.size() > 0
- * 2. board.length = 9 and fixedCells.length = 9
- * 3. forall r,c in [0,8]: 0 <= board[r][c] <= 9
- * 4. forall r,c in [0,8]: fixedCells[r][c] <-> currentPuzzle.puzzle[r][c] != 0
- * 5. forall r,c in [0,8]: fixedCells[r][c] => board[r][c] = currentPuzzle.puzzle[r][c]
  */
+/*@
+ @ invariant puzzles != null && puzzles.size() > 0;
+ @ invariant currentPuzzle != null;
+ @ invariant board != null && fixedCells != null;
+ @ invariant currentPuzzle.puzzle() != null && currentPuzzle.solution() != null;
+ @ invariant board.length == SIZE && fixedCells.length == SIZE;
+ @ invariant currentPuzzle.puzzle().length == SIZE && currentPuzzle.solution().length == SIZE;
+ @ invariant (\forall int row; 0 <= row && row < SIZE;
+ @              board[row] != null && board[row].length == SIZE
+ @           && fixedCells[row] != null && fixedCells[row].length == SIZE
+ @           && currentPuzzle.puzzle()[row] != null && currentPuzzle.puzzle()[row].length == SIZE
+ @           && currentPuzzle.solution()[row] != null && currentPuzzle.solution()[row].length == SIZE);
+ @ invariant (\forall int row, column;
+ @              0 <= row && row < SIZE && 0 <= column && column < SIZE;
+ @              0 <= board[row][column] && board[row][column] <= 9);
+ @ invariant (\forall int row, column;
+ @              0 <= row && row < SIZE && 0 <= column && column < SIZE;
+ @              fixedCells[row][column] <==> currentPuzzle.puzzle()[row][column] != 0);
+ @ invariant (\forall int row, column;
+ @              0 <= row && row < SIZE && 0 <= column && column < SIZE;
+ @              fixedCells[row][column] ==> board[row][column] == currentPuzzle.puzzle()[row][column]);
+ @*/
 @SuppressWarnings("deprecation")
-public class Model extends Observable {
-    public static final int SIZE = 9;
+public class Model extends Observable implements SudokuModel {
     private static final String PUZZLE_RESOURCE = "/puzzles.txt";
 
     private final List<Puzzle> puzzles;
@@ -40,10 +55,25 @@ public class Model extends Observable {
     private boolean hintEnabled = true;
     private boolean randomPuzzleSelectionEnabled = true;
 
+    /*@
+     @ ensures invariant();
+     @ ensures validationFeedbackEnabled;
+     @ ensures hintEnabled;
+     @ ensures randomPuzzleSelectionEnabled;
+     @ ensures !canUndo();
+     @*/
     public Model() {
         this(new Random());
     }
 
+    /*@
+     @ requires random != null;
+     @ ensures invariant();
+     @ ensures validationFeedbackEnabled;
+     @ ensures hintEnabled;
+     @ ensures randomPuzzleSelectionEnabled;
+     @ ensures !canUndo();
+     @*/
     Model(Random random) {
         assert random != null : "random != null";
         this.random = random;
@@ -52,10 +82,10 @@ public class Model extends Observable {
         assert invariant();
     }
 
-    /**
-     * Pre: true
-     * Post: result = board[row][column]
-     */
+    /*@
+     @ requires 0 <= row && row < SIZE && 0 <= column && column < SIZE;
+     @ ensures \result == board[row][column];
+     @*/
     public int getCellValue(int row, int column) {
         assert invariant();
         assert isInBounds(row, column) : "0 <= row,column < 9";
@@ -64,10 +94,10 @@ public class Model extends Observable {
         return value;
     }
 
-    /**
-     * Pre: true
-     * Post: result <-> currentPuzzle.puzzle[row][column] = 0
-     */
+    /*@
+     @ requires 0 <= row && row < SIZE && 0 <= column && column < SIZE;
+     @ ensures \result <==> currentPuzzle.puzzle()[row][column] == 0;
+     @*/
     public boolean isEditableCell(int row, int column) {
         assert invariant();
         assert isInBounds(row, column) : "0 <= row,column < 9";
@@ -76,10 +106,10 @@ public class Model extends Observable {
         return editable;
     }
 
-    /**
-     * Pre: true
-     * Post: result <-> currentPuzzle.puzzle[row][column] != 0
-     */
+    /*@
+     @ requires 0 <= row && row < SIZE && 0 <= column && column < SIZE;
+     @ ensures \result <==> currentPuzzle.puzzle()[row][column] != 0;
+     @*/
     public boolean isFixedCell(int row, int column) {
         assert invariant();
         assert isInBounds(row, column) : "0 <= row,column < 9";
@@ -88,10 +118,10 @@ public class Model extends Observable {
         return fixed;
     }
 
-    /**
-     * Pre: true
-     * Post: result <-> board[row][column] = 0
-     */
+    /*@
+     @ requires 0 <= row && row < SIZE && 0 <= column && column < SIZE;
+     @ ensures \result <==> board[row][column] == 0;
+     @*/
     public boolean isCellEmpty(int row, int column) {
         assert invariant();
         assert isInBounds(row, column) : "0 <= row,column < 9";
@@ -100,51 +130,72 @@ public class Model extends Observable {
         return empty;
     }
 
-    /**
-     * Pre: 0 <= row,column < 9 and 1 <= value <= 9
-     * Post:
-     * - if the target cell is editable then board[row][column] = value
-     * - if the target cell is fixed then the board is unchanged
-     */
+    /*@
+     @ requires 0 <= row && row < SIZE && 0 <= column && column < SIZE;
+     @ requires 1 <= value && value <= 9;
+     @ ensures \result ==> board[row][column] == value;
+     @ ensures !\result ==> board[row][column] == \old(board[row][column]);
+     @ ensures (\forall int r, c;
+     @              0 <= r && r < SIZE && 0 <= c && c < SIZE
+     @           && !(r == row && c == column);
+     @              board[r][c] == \old(board[r][c]));
+     @*/
     public boolean setCellValue(int row, int column, int value) {
         assert invariant();
         assert isInBounds(row, column) : "0 <= row,column < 9";
         assert value >= 1 && value <= 9 : "1 <= value <= 9";
+        int[][] oldBoard = copyOf(board);
+        int oldUndoCount = undoSnapshots.size();
         if (!isEditableCell(row, column) || board[row][column] == value) {
+            assert boardsEqual(board, oldBoard) : "board must be unchanged when setCellValue returns false";
+            assert undoSnapshots.size() == oldUndoCount : "undo history must be unchanged when setCellValue returns false";
             assert invariant();
             return false;
         }
         saveUndoSnapshot();
         board[row][column] = value;
         publishChange();
+        assert board[row][column] == value : "successful setCellValue must write the requested value";
+        assert boardsEqualExceptAt(board, oldBoard, row, column) : "only the requested cell may change during setCellValue";
+        assert undoSnapshots.size() == oldUndoCount + 1 : "successful setCellValue must add one undo snapshot";
         assert invariant();
         return true;
     }
 
-    /**
-     * Pre: 0 <= row,column < 9
-     * Post:
-     * - if the target cell is editable then board[row][column] = 0
-     * - if the target cell is fixed then the board is unchanged
-     */
+    /*@
+     @ requires 0 <= row && row < SIZE && 0 <= column && column < SIZE;
+     @ ensures \result ==> board[row][column] == 0;
+     @ ensures !\result ==> board[row][column] == \old(board[row][column]);
+     @ ensures (\forall int r, c;
+     @              0 <= r && r < SIZE && 0 <= c && c < SIZE
+     @           && !(r == row && c == column);
+     @              board[r][c] == \old(board[r][c]));
+     @*/
     public boolean clearCell(int row, int column) {
         assert invariant();
         assert isInBounds(row, column) : "0 <= row,column < 9";
+        int[][] oldBoard = copyOf(board);
+        int oldUndoCount = undoSnapshots.size();
         if (!isEditableCell(row, column) || board[row][column] == 0) {
+            assert boardsEqual(board, oldBoard) : "board must be unchanged when clearCell returns false";
+            assert undoSnapshots.size() == oldUndoCount : "undo history must be unchanged when clearCell returns false";
             assert invariant();
             return false;
         }
         saveUndoSnapshot();
         board[row][column] = 0;
         publishChange();
+        assert board[row][column] == 0 : "successful clearCell must clear the target cell";
+        assert boardsEqualExceptAt(board, oldBoard, row, column) : "only the requested cell may change during clearCell";
+        assert undoSnapshots.size() == oldUndoCount + 1 : "successful clearCell must add one undo snapshot";
         assert invariant();
         return true;
     }
 
-    /**
-     * Pre: true
-     * Post: result <-> an undo snapshot exists
-     */
+    /*@
+     @ requires true;
+     @ ensures \result <==> undoSnapshots.size() > 0;
+     @*/
     public boolean canUndo() {
         assert invariant();
         boolean result = !undoSnapshots.isEmpty();
@@ -152,30 +203,34 @@ public class Model extends Observable {
         return result;
     }
 
-    /**
-     * Pre: true
-     * Post:
-     * - if a snapshot exists then board = previous board state and result = true
-     * - otherwise board is unchanged and result = false
-     */
+    /*@
+     @ requires true;
+     @ ensures !\result ==> board == \old(board);
+     @ ensures \result <==> \old(undoSnapshots.size()) > 0;
+     @ ensures \result ==> board equals the board stored in the most recent undo snapshot before the call;
+     @*/
     public boolean undo() {
         assert invariant();
+        int[][] oldBoard = copyOf(board);
+        int oldUndoCount = undoSnapshots.size();
         if (undoSnapshots.isEmpty()) {
+            assert boardsEqual(board, oldBoard) : "board must be unchanged when undo returns false";
             assert invariant();
             return false;
         }
         BoardSnapshot snapshot = undoSnapshots.remove(undoSnapshots.size() - 1);
         board = copyOf(snapshot.boardState());
         publishChange();
+        assert boardsEqual(board, snapshot.boardState()) : "undo must restore the most recent snapshot";
+        assert undoSnapshots.size() == oldUndoCount - 1 : "successful undo must consume one undo snapshot";
         assert invariant();
         return true;
     }
 
-    /**
-     * Pre: 0 <= row,column < 9
-     * Post:
-     * result <-> hintEnabled and the target cell is editable and empty
-     */
+    /*@
+     @ requires 0 <= row && row < SIZE && 0 <= column && column < SIZE;
+     @ ensures \result <==> (hintEnabled && isEditableCell(row, column) && isCellEmpty(row, column));
+     @*/
     public boolean canHintAt(int row, int column) {
         assert invariant();
         assert isInBounds(row, column) : "0 <= row,column < 9";
@@ -184,57 +239,86 @@ public class Model extends Observable {
         return result;
     }
 
-    /**
-     * Pre: 0 <= row,column < 9
-     * Post:
-     * - if canHintAt(row,column) then board[row][column] = currentPuzzle.solution[row][column]
-     * - otherwise the board is unchanged
-     */
+    /*@
+     @ requires 0 <= row && row < SIZE && 0 <= column && column < SIZE;
+     @ ensures \result ==> board[row][column] == currentPuzzle.solution()[row][column];
+     @ ensures !\result ==> board[row][column] == \old(board[row][column]);
+     @ ensures (\forall int r, c;
+     @              0 <= r && r < SIZE && 0 <= c && c < SIZE
+     @           && !(r == row && c == column);
+     @              board[r][c] == \old(board[r][c]));
+     @*/
     public boolean applyHint(int row, int column) {
         assert invariant();
         assert isInBounds(row, column) : "0 <= row,column < 9";
+        int[][] oldBoard = copyOf(board);
+        int oldUndoCount = undoSnapshots.size();
         if (!canHintAt(row, column)) {
+            assert boardsEqual(board, oldBoard) : "board must be unchanged when applyHint returns false";
+            assert undoSnapshots.size() == oldUndoCount : "undo history must be unchanged when applyHint returns false";
             assert invariant();
             return false;
         }
         saveUndoSnapshot();
         board[row][column] = currentPuzzle.solution()[row][column];
         publishChange();
+        assert board[row][column] == currentPuzzle.solution()[row][column] : "successful applyHint must write the solution value";
+        assert boardsEqualExceptAt(board, oldBoard, row, column) : "only the requested cell may change during applyHint";
+        assert undoSnapshots.size() == oldUndoCount + 1 : "successful applyHint must add one undo snapshot";
         assert invariant();
         return true;
     }
 
-    /**
-     * Pre: true
-     * Post: board = currentPuzzle.puzzle and completion is not forced
-     */
+    /*@
+     @ requires true;
+     @ ensures (\forall int r, c;
+     @              0 <= r && r < SIZE && 0 <= c && c < SIZE;
+     @              board[r][c] == currentPuzzle.puzzle()[r][c]);
+     @*/
     public void resetPuzzle() {
         assert invariant();
+        int[][] oldBoard = copyOf(board);
+        int oldUndoCount = undoSnapshots.size();
         if (boardsEqual(board, currentPuzzle.puzzle())) {
+            assert boardsEqual(board, oldBoard) : "resetPuzzle must leave an unchanged puzzle unchanged";
+            assert undoSnapshots.size() == oldUndoCount : "undo history must be unchanged when resetPuzzle makes no change";
             assert invariant();
             return;
         }
         saveUndoSnapshot();
         board = copyOf(currentPuzzle.puzzle());
         publishChange();
+        assert boardsEqual(board, currentPuzzle.puzzle()) : "resetPuzzle must restore the original puzzle state";
+        assert undoSnapshots.size() == oldUndoCount + 1 : "successful resetPuzzle must add one undo snapshot";
         assert invariant();
     }
 
-    /**
-     * Pre: true
-     * Post: a new puzzle is loaded and undo history is discarded
-     */
+    /*@
+     @ requires true;
+     @ ensures boardsEqual(board, currentPuzzle.puzzle());
+     @ ensures !canUndo();
+     @*/
     public void newGame() {
         assert invariant();
+        boolean oldValidationFeedbackEnabled = validationFeedbackEnabled;
+        boolean oldHintEnabled = hintEnabled;
+        boolean oldRandomPuzzleSelectionEnabled = randomPuzzleSelectionEnabled;
         loadPuzzle(selectPuzzleIndex());
         publishChange();
+        assert boardsEqual(board, currentPuzzle.puzzle()) : "newGame must load the puzzle clues into the board";
+        assert !canUndo() : "newGame must discard undo history";
+        assert validationFeedbackEnabled == oldValidationFeedbackEnabled : "newGame must not change validation feedback flag";
+        assert hintEnabled == oldHintEnabled : "newGame must not change hint flag";
+        assert randomPuzzleSelectionEnabled == oldRandomPuzzleSelectionEnabled : "newGame must not change puzzle selection flag";
         assert invariant();
     }
 
-    /**
-     * Pre: true
-     * Post: result <-> forall r,c in [0,8]: board[r][c] = currentPuzzle.solution[r][c]
-     */
+    /*@
+     @ requires true;
+     @ ensures \result <==> (\forall int row, column;
+     @              0 <= row && row < SIZE && 0 <= column && column < SIZE;
+     @              board[row][column] == currentPuzzle.solution()[row][column]);
+     @*/
     public boolean isSolved() {
         assert invariant();
         for (int row = 0; row < SIZE; row++) {
@@ -249,26 +333,28 @@ public class Model extends Observable {
         return true;
     }
 
-    /**
-     * Pre: true
-     * Post:
-     * result contains exactly those occupied cells that duplicate a value in
-     * a row, column, or 3x3 sub-grid
-     */
-    public Set<CellPosition> getInvalidCells() {
+    /*@
+     @ requires true;
+     @ ensures (\forall int row, column;
+     @              0 <= row && row < SIZE && 0 <= column && column < SIZE;
+     @              \result.contains(new SudokuModel.CellPosition(row, column))
+     @              <==> isConflictingOccupiedCell(row, column));
+     @*/
+    public Set<SudokuModel.CellPosition> getInvalidCells() {
         assert invariant();
-        Set<CellPosition> invalidCells = new LinkedHashSet<>();
+        Set<SudokuModel.CellPosition> invalidCells = new LinkedHashSet<>();
         markInvalidRows(invalidCells);
         markInvalidColumns(invalidCells);
         markInvalidBoxes(invalidCells);
+        assert invalidCellSetMatchesBoard(invalidCells) : "getInvalidCells must return exactly the conflicting occupied cells";
         assert invariant();
         return Collections.unmodifiableSet(invalidCells);
     }
 
-    /**
-     * Pre: true
-     * Post: result = validationFeedbackEnabled
-     */
+    /*@
+     @ requires true;
+     @ ensures \result == validationFeedbackEnabled;
+     @*/
     public boolean isValidationFeedbackEnabled() {
         assert invariant();
         boolean result = validationFeedbackEnabled;
@@ -276,21 +362,24 @@ public class Model extends Observable {
         return result;
     }
 
-    /**
-     * Pre: true
-     * Post: validationFeedbackEnabled = enabled
-     */
+    /*@
+     @ requires true;
+     @ ensures validationFeedbackEnabled == enabled;
+     @*/
     public void setValidationFeedbackEnabled(boolean enabled) {
         assert invariant();
+        int[][] oldBoard = copyOf(board);
         validationFeedbackEnabled = enabled;
         publishChange();
+        assert validationFeedbackEnabled == enabled : "setValidationFeedbackEnabled must store the requested flag";
+        assert boardsEqual(board, oldBoard) : "setValidationFeedbackEnabled must not modify the board";
         assert invariant();
     }
 
-    /**
-     * Pre: true
-     * Post: result = hintEnabled
-     */
+    /*@
+     @ requires true;
+     @ ensures \result == hintEnabled;
+     @*/
     public boolean isHintEnabled() {
         assert invariant();
         boolean result = hintEnabled;
@@ -298,21 +387,24 @@ public class Model extends Observable {
         return result;
     }
 
-    /**
-     * Pre: true
-     * Post: hintEnabled = enabled
-     */
+    /*@
+     @ requires true;
+     @ ensures hintEnabled == enabled;
+     @*/
     public void setHintEnabled(boolean enabled) {
         assert invariant();
+        int[][] oldBoard = copyOf(board);
         hintEnabled = enabled;
         publishChange();
+        assert hintEnabled == enabled : "setHintEnabled must store the requested flag";
+        assert boardsEqual(board, oldBoard) : "setHintEnabled must not modify the board";
         assert invariant();
     }
 
-    /**
-     * Pre: true
-     * Post: result = randomPuzzleSelectionEnabled
-     */
+    /*@
+     @ requires true;
+     @ ensures \result == randomPuzzleSelectionEnabled;
+     @*/
     public boolean isRandomPuzzleSelectionEnabled() {
         assert invariant();
         boolean result = randomPuzzleSelectionEnabled;
@@ -320,18 +412,31 @@ public class Model extends Observable {
         return result;
     }
 
-    /**
-     * Pre: true
-     * Post: randomPuzzleSelectionEnabled = enabled
-     */
+    /*@
+     @ requires true;
+     @ ensures randomPuzzleSelectionEnabled == enabled;
+     @*/
     public void setRandomPuzzleSelectionEnabled(boolean enabled) {
         assert invariant();
+        int[][] oldBoard = copyOf(board);
         randomPuzzleSelectionEnabled = enabled;
         publishChange();
+        assert randomPuzzleSelectionEnabled == enabled : "setRandomPuzzleSelectionEnabled must store the requested flag";
+        assert boardsEqual(board, oldBoard) : "setRandomPuzzleSelectionEnabled must not modify the board";
         assert invariant();
     }
 
-    public static record CellPosition(int row, int column) { }
+    /*@
+     @ requires observer != null;
+     @ ensures invariant();
+     @*/
+    @Override
+    public synchronized void addObserver(Observer observer) {
+        assert invariant();
+        assert observer != null : "observer != null";
+        super.addObserver(observer);
+        assert invariant();
+    }
 
     private void publishChange() {
         setChanged();
@@ -543,7 +648,7 @@ public class Model extends Observable {
         return true;
     }
 
-    private void markInvalidRows(Set<CellPosition> invalidCells) {
+    private void markInvalidRows(Set<SudokuModel.CellPosition> invalidCells) {
         for (int row = 0; row < SIZE; row++) {
             int[] counts = new int[SIZE + 1];
             for (int column = 0; column < SIZE; column++) {
@@ -555,13 +660,13 @@ public class Model extends Observable {
             for (int column = 0; column < SIZE; column++) {
                 int value = board[row][column];
                 if (value != 0 && counts[value] > 1) {
-                    invalidCells.add(new CellPosition(row, column));
+                    invalidCells.add(new SudokuModel.CellPosition(row, column));
                 }
             }
         }
     }
 
-    private void markInvalidColumns(Set<CellPosition> invalidCells) {
+    private void markInvalidColumns(Set<SudokuModel.CellPosition> invalidCells) {
         for (int column = 0; column < SIZE; column++) {
             int[] counts = new int[SIZE + 1];
             for (int row = 0; row < SIZE; row++) {
@@ -573,13 +678,13 @@ public class Model extends Observable {
             for (int row = 0; row < SIZE; row++) {
                 int value = board[row][column];
                 if (value != 0 && counts[value] > 1) {
-                    invalidCells.add(new CellPosition(row, column));
+                    invalidCells.add(new SudokuModel.CellPosition(row, column));
                 }
             }
         }
     }
 
-    private void markInvalidBoxes(Set<CellPosition> invalidCells) {
+    private void markInvalidBoxes(Set<SudokuModel.CellPosition> invalidCells) {
         for (int boxRow = 0; boxRow < SIZE; boxRow += 3) {
             for (int boxColumn = 0; boxColumn < SIZE; boxColumn += 3) {
                 int[] counts = new int[SIZE + 1];
@@ -595,7 +700,7 @@ public class Model extends Observable {
                     for (int column = boxColumn; column < boxColumn + 3; column++) {
                         int value = board[row][column];
                         if (value != 0 && counts[value] > 1) {
-                            invalidCells.add(new CellPosition(row, column));
+                            invalidCells.add(new SudokuModel.CellPosition(row, column));
                         }
                     }
                 }
@@ -603,9 +708,81 @@ public class Model extends Observable {
         }
     }
 
+    private boolean invalidCellSetMatchesBoard(Set<SudokuModel.CellPosition> invalidCells) {
+        for (int row = 0; row < SIZE; row++) {
+            for (int column = 0; column < SIZE; column++) {
+                boolean listed = invalidCells.contains(new SudokuModel.CellPosition(row, column));
+                if (listed != isConflictingOccupiedCell(row, column)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean isConflictingOccupiedCell(int row, int column) {
+        if (board[row][column] == 0) {
+            return false;
+        }
+        return appearsMoreThanOnceInRow(row, column)
+                || appearsMoreThanOnceInColumn(row, column)
+                || appearsMoreThanOnceInBox(row, column);
+    }
+
+    private boolean appearsMoreThanOnceInRow(int row, int column) {
+        int value = board[row][column];
+        int occurrences = 0;
+        for (int currentColumn = 0; currentColumn < SIZE; currentColumn++) {
+            if (board[row][currentColumn] == value) {
+                occurrences++;
+            }
+        }
+        return occurrences > 1;
+    }
+
+    private boolean appearsMoreThanOnceInColumn(int row, int column) {
+        int value = board[row][column];
+        int occurrences = 0;
+        for (int currentRow = 0; currentRow < SIZE; currentRow++) {
+            if (board[currentRow][column] == value) {
+                occurrences++;
+            }
+        }
+        return occurrences > 1;
+    }
+
+    private boolean appearsMoreThanOnceInBox(int row, int column) {
+        int value = board[row][column];
+        int boxRow = (row / 3) * 3;
+        int boxColumn = (column / 3) * 3;
+        int occurrences = 0;
+        for (int currentRow = boxRow; currentRow < boxRow + 3; currentRow++) {
+            for (int currentColumn = boxColumn; currentColumn < boxColumn + 3; currentColumn++) {
+                if (board[currentRow][currentColumn] == value) {
+                    occurrences++;
+                }
+            }
+        }
+        return occurrences > 1;
+    }
+
     private boolean boardsEqual(int[][] left, int[][] right) {
         for (int row = 0; row < SIZE; row++) {
             for (int column = 0; column < SIZE; column++) {
+                if (left[row][column] != right[row][column]) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean boardsEqualExceptAt(int[][] left, int[][] right, int excludedRow, int excludedColumn) {
+        for (int row = 0; row < SIZE; row++) {
+            for (int column = 0; column < SIZE; column++) {
+                if (row == excludedRow && column == excludedColumn) {
+                    continue;
+                }
                 if (left[row][column] != right[row][column]) {
                     return false;
                 }
@@ -630,26 +807,43 @@ public class Model extends Observable {
         if (puzzles == null || puzzles.isEmpty()) {
             return false;
         }
-        if (board == null || fixedCells == null || currentPuzzle == null) {
+        if (board == null || fixedCells == null || undoSnapshots == null || currentPuzzle == null) {
             return false;
         }
-        if (board.length != SIZE || fixedCells.length != SIZE || currentPuzzle.puzzle().length != SIZE) {
+        if (currentPuzzle.puzzle() == null || currentPuzzle.solution() == null) {
+            return false;
+        }
+        if (board.length != SIZE || fixedCells.length != SIZE
+                || currentPuzzle.puzzle().length != SIZE || currentPuzzle.solution().length != SIZE) {
             return false;
         }
         for (int row = 0; row < SIZE; row++) {
-            if (board[row].length != SIZE || fixedCells[row].length != SIZE || currentPuzzle.puzzle()[row].length != SIZE) {
+            if (board[row] == null || fixedCells[row] == null
+                    || currentPuzzle.puzzle()[row] == null || currentPuzzle.solution()[row] == null) {
+                return false;
+            }
+            if (board[row].length != SIZE || fixedCells[row].length != SIZE
+                    || currentPuzzle.puzzle()[row].length != SIZE || currentPuzzle.solution()[row].length != SIZE) {
                 return false;
             }
             for (int column = 0; column < SIZE; column++) {
                 int value = board[row][column];
+                int clue = currentPuzzle.puzzle()[row][column];
+                int solutionValue = currentPuzzle.solution()[row][column];
                 if (value < 0 || value > 9) {
                     return false;
                 }
-                boolean expectedFixed = currentPuzzle.puzzle()[row][column] != 0;
+                if (clue < 0 || clue > 9 || solutionValue < 1 || solutionValue > 9) {
+                    return false;
+                }
+                boolean expectedFixed = clue != 0;
                 if (fixedCells[row][column] != expectedFixed) {
                     return false;
                 }
-                if (fixedCells[row][column] && board[row][column] != currentPuzzle.puzzle()[row][column]) {
+                if (fixedCells[row][column] && board[row][column] != clue) {
+                    return false;
+                }
+                if (clue != 0 && clue != solutionValue) {
                     return false;
                 }
             }
