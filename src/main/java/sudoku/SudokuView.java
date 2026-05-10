@@ -18,7 +18,6 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JFrame;
-import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
@@ -26,17 +25,25 @@ import javax.swing.SwingConstants;
 import javax.swing.WindowConstants;
 import javax.swing.border.Border;
 
+/**
+ * Swing View in the MVC design.
+ * Renders the Sudoku board, buttons and runtime flags. It implements Observer
+ * so it can redraw itself whenever SudokuModel publishes a change, and forwards
+ * user actions to SudokuController instead of changing game state directly.
+ */
 @SuppressWarnings("deprecation")
 public class SudokuView extends JFrame implements Observer {
+    private static final long serialVersionUID = 1L;
+
     private static final Color FIXED_BACKGROUND = new Color(225, 225, 225);
     private static final Color EDITABLE_BACKGROUND = Color.WHITE;
     private static final Color INVALID_BACKGROUND = new Color(255, 219, 219);
     private static final Color SELECTED_BACKGROUND = new Color(214, 234, 248);
 
-    private final SudokuModel model;
+    private final ISudokuModel model;
     private SudokuController controller;
 
-    private final JTextField[][] cells = new JTextField[SudokuModel.SIZE][SudokuModel.SIZE];
+    private final JTextField[][] cells = new JTextField[ISudokuModel.SIZE][ISudokuModel.SIZE];
     private final JButton[] digitButtons = new JButton[9];
     private final JButton eraseButton = new JButton("Erase");
     private final JButton undoButton = new JButton("Undo");
@@ -50,7 +57,12 @@ public class SudokuView extends JFrame implements Observer {
     private int selectedRow;
     private int selectedColumn;
 
-    public SudokuView(SudokuModel model) {
+    /**
+     * Builds the Swing window around one shared Model.
+     * The View registers itself as an observer before the first refresh so the
+     * screen always reflects the same Model state used by the Controller.
+     */
+    public SudokuView(ISudokuModel model) {
         super("Sudoku");
         assert model != null : "model != null";
         this.model = model;
@@ -59,12 +71,22 @@ public class SudokuView extends JFrame implements Observer {
         update(null, null);
     }
 
+    /**
+     * Attaches the Controller after construction.
+     * Action listeners are installed here because they forward every user event
+     * to the Controller rather than editing the Model directly.
+     */
     public void attachController(SudokuController controller) {
         assert controller != null : "controller != null";
         this.controller = controller;
         wireActions();
     }
 
+    /**
+     * Updates visual selection and returns keyboard focus to the selected cell.
+     * Keeping focus on the grid lets arrow keys and digit keys continue working
+     * after a mouse click or button update.
+     */
     public void setSelectedCell(int row, int column) {
         selectedRow = row;
         selectedColumn = column;
@@ -72,6 +94,11 @@ public class SudokuView extends JFrame implements Observer {
         cells[row][column].requestFocusInWindow();
     }
 
+    /**
+     * Applies enabled/disabled states calculated by the Controller.
+     * The View only receives booleans here, which keeps display code separate
+     * from the game rules that decide whether an action is valid.
+     */
     public void setControlStates(boolean digitInputEnabled, boolean eraseEnabled, boolean hintEnabled, boolean undoEnabled) {
         for (JButton digitButton : digitButtons) {
             digitButton.setEnabled(digitInputEnabled);
@@ -85,6 +112,11 @@ public class SudokuView extends JFrame implements Observer {
         JOptionPane.showMessageDialog(this, "Puzzle completed correctly.");
     }
 
+    /**
+     * Observer callback from the Model.
+     * Any board edit or runtime flag change comes through this method, so the
+     * checkboxes, board colours and control availability stay in sync.
+     */
     @Override
     public void update(Observable observable, Object argument) {
         validationFeedbackBox.setSelected(model.isValidationFeedbackEnabled());
@@ -112,10 +144,10 @@ public class SudokuView extends JFrame implements Observer {
     }
 
     private JPanel buildGridPanel() {
-        JPanel gridPanel = new JPanel(new GridLayout(SudokuModel.SIZE, SudokuModel.SIZE));
+        JPanel gridPanel = new JPanel(new GridLayout(ISudokuModel.SIZE, ISudokuModel.SIZE));
         gridPanel.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
-        for (int row = 0; row < SudokuModel.SIZE; row++) {
-            for (int column = 0; column < SudokuModel.SIZE; column++) {
+        for (int row = 0; row < ISudokuModel.SIZE; row++) {
+            for (int column = 0; column < ISudokuModel.SIZE; column++) {
                 JTextField cell = new JTextField();
                 cell.setHorizontalAlignment(SwingConstants.CENTER);
                 cell.setFont(new Font("SansSerif", Font.BOLD, 24));
@@ -150,9 +182,8 @@ public class SudokuView extends JFrame implements Observer {
         actionsPanel.add(resetButton);
         actionsPanel.add(newGameButton);
 
-        JPanel flagsPanel = new JPanel(new GridLayout(4, 1, 6, 6));
+        JPanel flagsPanel = new JPanel(new GridLayout(3, 1, 6, 6));
         flagsPanel.setBorder(BorderFactory.createTitledBorder("Flags"));
-        flagsPanel.add(new JLabel("Runtime options:"));
         flagsPanel.add(validationFeedbackBox);
         flagsPanel.add(hintBox);
         flagsPanel.add(randomPuzzleBox);
@@ -163,6 +194,10 @@ public class SudokuView extends JFrame implements Observer {
         return rightPanel;
     }
 
+    /**
+     * Converts Swing button and checkbox events into Controller calls.
+     * This is the main View-to-Controller boundary in the MVC design.
+     */
     private void wireActions() {
         for (int index = 0; index < digitButtons.length; index++) {
             int value = index + 1;
@@ -173,11 +208,18 @@ public class SudokuView extends JFrame implements Observer {
         hintButton.addActionListener(event -> controller.hintSelectedCell());
         resetButton.addActionListener(event -> controller.resetPuzzle());
         newGameButton.addActionListener(event -> controller.newGame());
-        validationFeedbackBox.addActionListener(event -> controller.setValidationFeedbackEnabled(validationFeedbackBox.isSelected()));
+        validationFeedbackBox.addActionListener(event ->
+                controller.setValidationFeedbackEnabled(validationFeedbackBox.isSelected()));
         hintBox.addActionListener(event -> controller.setHintEnabled(hintBox.isSelected()));
-        randomPuzzleBox.addActionListener(event -> controller.setRandomPuzzleSelectionEnabled(randomPuzzleBox.isSelected()));
+        randomPuzzleBox.addActionListener(event ->
+                controller.setRandomPuzzleSelectionEnabled(randomPuzzleBox.isSelected()));
     }
 
+    /**
+     * Installs mouse and keyboard handlers for one cell.
+     * Mouse clicks change selection, arrow keys move selection, and digit keys
+     * are forwarded as number input for the currently selected cell.
+     */
     private void installCellHandlers(JTextField cell, int row, int column) {
         cell.addMouseListener(new MouseAdapter() {
             @Override
@@ -209,6 +251,10 @@ public class SudokuView extends JFrame implements Observer {
         });
     }
 
+    /**
+     * Converts top-row and numpad key events into Sudoku values.
+     * Returning -1 lets the caller ignore non-digit keys such as Shift or Tab.
+     */
     private int extractDigit(KeyEvent event) {
         if (event.getKeyCode() >= KeyEvent.VK_1 && event.getKeyCode() <= KeyEvent.VK_9) {
             return event.getKeyCode() - KeyEvent.VK_0;
@@ -219,25 +265,35 @@ public class SudokuView extends JFrame implements Observer {
         return -1;
     }
 
+    /**
+     * Redraws every cell from the Model.
+     * The method pulls value, editability and validation state from the Model so
+     * the View remains a reflection of state rather than a second copy of state.
+     */
     private void refreshBoard() {
-        Set<SudokuModel.CellPosition> invalidCells = model.isValidationFeedbackEnabled()
+        Set<ISudokuModel.CellPosition> invalidCells = model.isValidationFeedbackEnabled()
                 ? model.getInvalidCells()
                 : Collections.emptySet();
-        for (int row = 0; row < SudokuModel.SIZE; row++) {
-            for (int column = 0; column < SudokuModel.SIZE; column++) {
+        for (int row = 0; row < ISudokuModel.SIZE; row++) {
+            for (int column = 0; column < ISudokuModel.SIZE; column++) {
                 JTextField cell = cells[row][column];
                 int value = model.getCellValue(row, column);
                 cell.setText(value == 0 ? "" : String.valueOf(value));
                 cell.setBorder(createCellBorder(row, column));
-                cell.setForeground(model.isFixedCell(row, column) ? Color.BLACK : new Color(0, 70, 140));
+                cell.setForeground(model.isEditableCell(row, column) ? new Color(0, 70, 140) : Color.BLACK);
                 cell.setBackground(resolveCellBackground(row, column, invalidCells));
             }
         }
     }
 
-    private Color resolveCellBackground(int row, int column, Set<SudokuModel.CellPosition> invalidCells) {
-        Color background = model.isFixedCell(row, column) ? FIXED_BACKGROUND : EDITABLE_BACKGROUND;
-        boolean invalid = invalidCells.contains(new SudokuModel.CellPosition(row, column));
+    /**
+     * Chooses the background colour for one cell.
+     * Invalid cells take priority over selection so conflicts remain visible
+     * even when the selected cell is part of the conflict.
+     */
+    private Color resolveCellBackground(int row, int column, Set<ISudokuModel.CellPosition> invalidCells) {
+        Color background = model.isEditableCell(row, column) ? EDITABLE_BACKGROUND : FIXED_BACKGROUND;
+        boolean invalid = invalidCells.contains(new ISudokuModel.CellPosition(row, column));
         if (invalid) {
             background = INVALID_BACKGROUND;
         } else if (row == selectedRow && column == selectedColumn) {
@@ -246,11 +302,16 @@ public class SudokuView extends JFrame implements Observer {
         return background;
     }
 
+    /**
+     * Creates Sudoku-style borders, with thicker lines around each 3 by 3 box.
+     * The selected cell gets a different border colour while preserving the same
+     * box thickness rules.
+     */
     private Border createCellBorder(int row, int column) {
         int top = row % 3 == 0 ? 2 : 1;
         int left = column % 3 == 0 ? 2 : 1;
-        int bottom = row == SudokuModel.SIZE - 1 ? 2 : (row % 3 == 2 ? 2 : 1);
-        int right = column == SudokuModel.SIZE - 1 ? 2 : (column % 3 == 2 ? 2 : 1);
+        int bottom = row == ISudokuModel.SIZE - 1 ? 2 : (row % 3 == 2 ? 2 : 1);
+        int right = column == ISudokuModel.SIZE - 1 ? 2 : (column % 3 == 2 ? 2 : 1);
         Color borderColor = row == selectedRow && column == selectedColumn ? new Color(41, 128, 185) : Color.BLACK;
         return BorderFactory.createMatteBorder(top, left, bottom, right, borderColor);
     }
